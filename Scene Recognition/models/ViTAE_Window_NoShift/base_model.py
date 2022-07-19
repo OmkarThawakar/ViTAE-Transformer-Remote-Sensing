@@ -131,7 +131,7 @@ class ViTAE_Window_NoShift_basic(nn.Module):
         self.layers = nn.ModuleList(Layers)
 
         # Classifier head
-        self.head = nn.Linear(self.tokens_dims[-1], num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(self.tokens_dims[-1]*2, num_classes) if num_classes > 0 else nn.Identity()
 
         self.apply(self._init_weights)
 
@@ -162,9 +162,12 @@ class ViTAE_Window_NoShift_basic(nn.Module):
 
         return torch.mean(x, 1)
 
-    def forward(self, x):
+    def forward(self, x, lbp):
+        
         x = self.forward_features(x)
-        x = self.head(x)
+        l = self.forward_features(lbp)
+        feat = torch.cat([x,l],1)
+        x = self.head(feat)
         return x
     
     # def train(self, mode=True, tag='default'):

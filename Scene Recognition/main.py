@@ -91,7 +91,9 @@ def parse_option():
     parser.add_argument("--gpu_num", default=None, type=int, help='id of split')
     # optimizer
     parser.add_argument('--optimizer', default='adamw', type=str, choices=['adamw','sgd'], help='type of optimizer')
-
+    # lbp_path
+    parser.add_argument('--lbp_root', default=None, type=str, choices=['cyclic LBP', 'cyclic LBP 5','cyclic LBP 10','cyclic LBP 30', 'cyclic LBP 40', 'cyclic LBP 50'], help='type of LBP ROOT')
+    
     args, unparsed = parser.parse_known_args()
 
     config = get_config(args)
@@ -113,6 +115,7 @@ def main(args,config):
     if config.DATA.DATASET == 'millionAID':
         config.DATA.DATA_PATH = '../Dataset/millionaid/'
         config.MODEL.NUM_CLASSES = 51
+        config.lbp_root = args.lbp_root
     elif config.DATA.DATASET == 'ucm':
         config.DATA.DATA_PATH = '../Dataset/ucm/'
         config.MODEL.NUM_CLASSES = 21
@@ -201,11 +204,13 @@ def main(args,config):
         for epoch in range(config.TRAIN.START_EPOCH, args.epochs):
             data_loader_train.sampler.set_epoch(epoch)
 
-            train_one_epoch(config, model, criterion, data_loader_train, optimizer, epoch, mixup_fn, lr_scheduler)
-            if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
-                save_checkpoint(config, epoch, model_without_ddp, max_accuracy, optimizer, lr_scheduler, logger)
+            # train_one_epoch(config, model, criterion, data_loader_train, optimizer, epoch, mixup_fn, lr_scheduler)
+            # if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
+            #     save_checkpoint(config, epoch, model_without_ddp, max_accuracy, optimizer, lr_scheduler, logger)
 
             acc1, acc5, loss = validate(config, data_loader_val, model)
+            print(acc1, acc5, loss)
+            exit(0)
             logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
             max_accuracy = max(max_accuracy, acc1)
             logger.info(f'Max accuracy: {max_accuracy:.2f}%')
@@ -259,14 +264,15 @@ def train_one_epoch(config, model, criterion, data_loader, optimizer, epoch, mix
 
     start = time.time()
     end = time.time()
-    for idx, (samples, targets) in enumerate(data_loader):
+    for idx, (samples,lbps, targets) in enumerate(data_loader):
         samples = samples.cuda(non_blocking=True)
+        lbps = lbps.cuda(non_blocking=True)
         targets = targets.cuda(non_blocking=True)
 
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
 
-        outputs = model(samples)
+        outputs = model(samples, lbps)
 
         if config.TRAIN.ACCUMULATION_STEPS > 1:
             loss = criterion(outputs, targets)
@@ -340,12 +346,13 @@ def validate(config, data_loader, model):
     acc5_meter = AverageMeter()
 
     end = time.time()
-    for idx, (images, target) in enumerate(data_loader):
+    for idx, (images,lbps, target) in enumerate(data_loader):
         images = images.cuda(non_blocking=True)
+        lbps = lbps.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
 
         # compute output
-        output = model(images)
+        output = model(images, lbps)
 
         # measure accuracy and record loss
         loss = criterion(output, target)

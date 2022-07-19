@@ -94,18 +94,20 @@ def build_loader(config, ratio, logger, split):
     return dataset_train, dataset_val, data_loader_train, data_loader_val, mixup_fn
 
 class MillionAIDDataset(data.Dataset):
-    def __init__(self, root, train=True, transform=None):
+    def __init__(self, root, lbp_root, train=True, transform=None):
 
         with open(os.path.join(root, 'train_labels.txt'), mode='r') as f:
             train_infos = f.readlines()
         f.close()
 
         trn_files = []
+        lbp_files = []
         trn_targets = []
 
         for item in train_infos:
             fname, _, idx = item.strip().split()
             trn_files.append(os.path.join(root + '/all_img', fname))
+            lbp_files.append(os.path.join(root + '/all_img1/{}'.format(lbp_root), fname))
             trn_targets.append(int(idx))
 
         with open(os.path.join(root, 'valid_labels.txt'), mode='r') as f:
@@ -113,18 +115,22 @@ class MillionAIDDataset(data.Dataset):
         f.close()
 
         val_files = []
+        val_lbp_files = []
         val_targets = []
 
         for item in valid_infos:
             fname, _, idx = item.strip().split()
             val_files.append(os.path.join(root + '/all_img', fname))
+            val_lbp_files.append(os.path.join(root + '/all_img1/{}'.format(lbp_root), fname))
             val_targets.append(int(idx))
 
         if train:
             self.files = trn_files
+            self.lbp = lbp_files
             self.targets = trn_targets
         else:
             self.files = val_files
+            self.lbp = val_lbp_files
             self.targets = val_targets
 
         self.transform = transform
@@ -136,14 +142,17 @@ class MillionAIDDataset(data.Dataset):
 
     def __getitem__(self, i):
         img_path = self.files[i]
+        lbp_path = self.lbp[i]
 
         img = Image.open(img_path)
+        lbp = Image.open(lbp_path)
 
         #if self.transform != None:
 
         img = self.transform(img)
+        lbp = self.transform(lbp)
 
-        return img, self.targets[i]
+        return img, lbp, self.targets[i]
 
 class UCMDataset(data.Dataset):
     def __init__(self, root, train=True, transform=None, split=None):
@@ -316,7 +325,7 @@ def build_dataset(logger, is_train, config, ratio, split):
         nb_classes = 1000
     elif config.DATA.DATASET == 'millionAID':
         logger.info('Loading MillionAID dataset!')
-        dataset = MillionAIDDataset(config.DATA.DATA_PATH, train=is_train, transform=transform)
+        dataset = MillionAIDDataset(config.DATA.DATA_PATH, config.lbp_root, train=is_train, transform=transform)
         nb_classes = 51
     elif config.DATA.DATASET == 'ucm':
         logger.info('Loading UCM dataset!')
