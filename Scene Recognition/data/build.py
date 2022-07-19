@@ -95,6 +95,9 @@ def build_loader(config, ratio, logger, split):
 
 class MillionAIDDataset(data.Dataset):
     def __init__(self, root, lbp_root, train=True, transform=None):
+        print('='*50)
+        print(" LBP type : {}".format(lbp_root))
+        print('='*50)
 
         with open(os.path.join(root, 'train_labels.txt'), mode='r') as f:
             train_infos = f.readlines()
