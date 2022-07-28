@@ -32,7 +32,10 @@ try:
     from apex import amp
 except ImportError:
     amp = None
-
+    
+    
+os.environ['MASTER_ADDR'] = 'localhost'
+os.environ['MASTER_PORT'] = '8886'
 
 def parse_option():
     parser = argparse.ArgumentParser('Remote sensing training and evaluation script', add_help=False)
@@ -417,6 +420,7 @@ if __name__ == '__main__':
     torch.cuda.set_device(config.LOCAL_RANK)
     torch.distributed.init_process_group(backend='nccl', init_method='env://', world_size=world_size, rank=rank)
     torch.distributed.barrier()
+
 
     #seed = config.SEED + dist.get_rank()
 

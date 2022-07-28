@@ -117,6 +117,7 @@ class ViTAE_Window_NoShift_basic(nn.Module):
         depth = np.sum(self.NC_depth)
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
         Layers = []
+        Layers2 = [] # added for textured stream
         for i in range(stages):
             startDpr = 0 if i==0 else self.NC_depth[i - 1]
             Layers.append(
@@ -126,10 +127,20 @@ class ViTAE_Window_NoShift_basic(nn.Module):
                 mlp_ratio=self.mlp_ratio[i], qkv_bias=self.qkv_bias[i], qk_scale=self.qk_scale[i], drop=self.drop[i], attn_drop=self.attn_drop[i],
                 norm_layer=self.norm_layer[i], gamma=gamma, init_values=init_values, SE=SE, window_size=window_size, relative_pos=relative_pos)
             )
+            
+            Layers2.append(
+                BasicLayer(img_size, in_chans, self.embed_dims[i], self.tokens_dims[i], self.downsample_ratios[i],
+                self.kernel_size[i], self.RC_heads[i], self.NC_heads[i], self.dilaions[i], self.RC_op[i],
+                self.RC_tokens_type[i], self.NC_tokens_type[i], self.RC_group[i], self.NC_group[i], self.NC_depth[i], dpr[startDpr:self.NC_depth[i]+startDpr],
+                mlp_ratio=self.mlp_ratio[i], qkv_bias=self.qkv_bias[i], qk_scale=self.qk_scale[i], drop=self.drop[i], attn_drop=self.attn_drop[i],
+                norm_layer=self.norm_layer[i], gamma=gamma, init_values=init_values, SE=SE, window_size=window_size, relative_pos=relative_pos)
+            )  # added for textured stream
+            
             img_size = img_size // self.downsample_ratios[i]
             in_chans = self.tokens_dims[i]
         self.layers = nn.ModuleList(Layers)
-
+        self.layers_lbp = nn.ModuleList(Layers2)  # added for textured stream
+        
         # Classifier head
         self.head = nn.Linear(self.tokens_dims[-1]*2, num_classes) if num_classes > 0 else nn.Identity()
 
@@ -161,11 +172,18 @@ class ViTAE_Window_NoShift_basic(nn.Module):
             x = layer(x)
 
         return torch.mean(x, 1)
+    
+    def forward_features_lbp(self, x):
+    
+        for layer in self.layers_lbp:
+            x = layer(x)
+
+        return torch.mean(x, 1)
 
     def forward(self, x, lbp):
         
         x = self.forward_features(x)
-        l = self.forward_features(lbp)
+        l = self.forward_features_lbp(lbp)
         feat = torch.cat([x,l],1)
         x = self.head(feat)
         return x
