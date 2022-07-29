@@ -82,7 +82,7 @@ class BasicLayer(nn.Module):
         return x
 
 class ViTAE_Window_NoShift_basic(nn.Module):
-    def __init__(self, img_size=224, in_chans=3, stages=4, embed_dims=64, token_dims=64, downsample_ratios=[4, 2, 2, 2], kernel_size=[7, 3, 3, 3], 
+    def __init__(self, img_size=224, in_chans=6, stages=4, embed_dims=64, token_dims=64, downsample_ratios=[4, 2, 2, 2], kernel_size=[7, 3, 3, 3], 
                 RC_heads=[1, 1, 1, 1], NC_heads=4, dilations=[[1, 2, 3, 4], [1, 2, 3], [1, 2], [1, 2]],
                 RC_op='cat', RC_tokens_type=['performer', 'transformer', 'transformer', 'transformer'], NC_tokens_type='transformer',
                 RC_group=[1, 1, 1, 1], NC_group=[1, 32, 64, 64], NC_depth=[2, 2, 6, 2], mlp_ratio=4., qkv_bias=True, qk_scale=None, drop_rate=0., 
@@ -128,21 +128,21 @@ class ViTAE_Window_NoShift_basic(nn.Module):
                 norm_layer=self.norm_layer[i], gamma=gamma, init_values=init_values, SE=SE, window_size=window_size, relative_pos=relative_pos)
             )
             
-            Layers2.append(
-                BasicLayer(img_size, in_chans, self.embed_dims[i], self.tokens_dims[i], self.downsample_ratios[i],
-                self.kernel_size[i], self.RC_heads[i], self.NC_heads[i], self.dilaions[i], self.RC_op[i],
-                self.RC_tokens_type[i], self.NC_tokens_type[i], self.RC_group[i], self.NC_group[i], self.NC_depth[i], dpr[startDpr:self.NC_depth[i]+startDpr],
-                mlp_ratio=self.mlp_ratio[i], qkv_bias=self.qkv_bias[i], qk_scale=self.qk_scale[i], drop=self.drop[i], attn_drop=self.attn_drop[i],
-                norm_layer=self.norm_layer[i], gamma=gamma, init_values=init_values, SE=SE, window_size=window_size, relative_pos=relative_pos)
-            )  # added for textured stream
+            # Layers2.append(
+            #     BasicLayer(img_size, in_chans, self.embed_dims[i], self.tokens_dims[i], self.downsample_ratios[i],
+            #     self.kernel_size[i], self.RC_heads[i], self.NC_heads[i], self.dilaions[i], self.RC_op[i],
+            #     self.RC_tokens_type[i], self.NC_tokens_type[i], self.RC_group[i], self.NC_group[i], self.NC_depth[i], dpr[startDpr:self.NC_depth[i]+startDpr],
+            #     mlp_ratio=self.mlp_ratio[i], qkv_bias=self.qkv_bias[i], qk_scale=self.qk_scale[i], drop=self.drop[i], attn_drop=self.attn_drop[i],
+            #     norm_layer=self.norm_layer[i], gamma=gamma, init_values=init_values, SE=SE, window_size=window_size, relative_pos=relative_pos)
+            # )  # added for textured stream
             
             img_size = img_size // self.downsample_ratios[i]
             in_chans = self.tokens_dims[i]
         self.layers = nn.ModuleList(Layers)
-        self.layers_lbp = nn.ModuleList(Layers2)  # added for textured stream
+        # self.layers_lbp = nn.ModuleList(Layers2)  # added for textured stream
         
         # Classifier head
-        self.head = nn.Linear(self.tokens_dims[-1]*2, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(self.tokens_dims[-1], num_classes) if num_classes > 0 else nn.Identity()
 
         self.apply(self._init_weights)
 
@@ -182,9 +182,12 @@ class ViTAE_Window_NoShift_basic(nn.Module):
 
     def forward(self, x, lbp):
         
-        x = self.forward_features(x)
-        l = self.forward_features_lbp(lbp)
-        feat = torch.cat([x,l],1)
+        # x = self.forward_features(x)
+        # l = self.forward_features_lbp(lbp)
+        # feat = torch.cat([x,l],1)
+
+        x = torch.concat([x,lbp], axis=1)
+        feat = self.forward_features(x)
         x = self.head(feat)
         return x
     

@@ -34,8 +34,8 @@ except ImportError:
     amp = None
     
     
-os.environ['MASTER_ADDR'] = 'localhost'
-os.environ['MASTER_PORT'] = '8886'
+# os.environ['MASTER_ADDR'] = 'localhost'
+# os.environ['MASTER_PORT'] = '8886'
 
 def parse_option():
     parser = argparse.ArgumentParser('Remote sensing training and evaluation script', add_help=False)
